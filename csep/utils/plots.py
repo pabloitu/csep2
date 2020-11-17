@@ -571,8 +571,10 @@ def plot_spatial_dataset(gridded, region, show=False, plot_args=None):
     figsize = plot_args.get('figsize', None)
     title = plot_args.get('title', 'Spatial Dataset')
     clim = plot_args.get('clim', None)
+    edgecolors = plot_args.get('edgecolors', None)
     clabel = plot_args.get('clabel', '')
     filename = plot_args.get('filename', None)
+    fontsize = plot_args.get('fontsize', 16)
     cmap = plot_args.get('cmap', None)
     projection = plot_args.get('projection', ccrs.PlateCarree())
 
@@ -581,7 +583,8 @@ def plot_spatial_dataset(gridded, region, show=False, plot_args=None):
     ax = fig.add_subplot(111, projection=projection)
 
     lons, lats = numpy.meshgrid(region.xs, region.ys)
-    im = ax.pcolormesh(lons, lats, gridded, cmap=cmap, transform=ccrs.PlateCarree())
+
+    im = ax.pcolor(lons, lats, gridded, cmap=cmap, edgecolors=edgecolors, snap=True, transform=ccrs.PlateCarree())
     ax.set_extent(extent)
     try:
         from cartopy.io import img_tiles
@@ -595,7 +598,7 @@ def plot_spatial_dataset(gridded, region, show=False, plot_args=None):
     # colorbar options
     # create an axes on the right side of ax. The width of cax will be 5%
     # of ax and the padding between cax and ax will be fixed at 0.05 inch.
-    cax = fig.add_axes([ax.get_position().x1 + 0.01, ax.get_position().y0, 0.025, ax.get_position().height])
+    cax = fig.add_axes([ax.get_position().x1 + 0.05, ax.get_position().y0, 0.025, ax.get_position().height])
     cbar = fig.colorbar(im, cax=cax)
     cbar.set_label(clabel)
     # gridlines options
@@ -605,7 +608,7 @@ def plot_spatial_dataset(gridded, region, show=False, plot_args=None):
     gl.ylabels_right = False
     gl.xformatter = LONGITUDE_FORMATTER
     gl.yformatter = LATITUDE_FORMATTER
-    ax.set_title(title, y=1.06)
+    ax.set_title(title, y=1.06, fontsize=fontsize)
     # this is a cartopy.GeoAxes
     if filename is not None:
         fig.savefig(filename + '.pdf')

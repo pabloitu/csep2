@@ -100,7 +100,7 @@ comcat_catalog = comcat_catalog.filter_spatial(forecast.region)
 #
 # We can perform the Number test on the catalog based forecast using the observed catalog we obtained from Comcat.
 
-number_test_result = catalog_evaluations.number_test(forecast, comcat_catalog)
+number_test_result = catalog_evaluations.spatial_test(forecast, comcat_catalog)
 
 ####################################################################################################################################
 # Plot number test result
