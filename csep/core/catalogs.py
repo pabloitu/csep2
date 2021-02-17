@@ -1,4 +1,5 @@
 import csv
+import gzip
 import json
 import operator
 import os
@@ -20,6 +21,7 @@ from csep.utils.calc import bin1d_vec
 from csep.utils.constants import CSEP_MW_BINS
 from csep.utils.log import LoggingMixin
 from csep.utils.readers import csep_ascii
+from csep.utils.file import get_file_extension
 
 
 class AbstractBaseCatalog(LoggingMixin):
@@ -377,7 +379,7 @@ class AbstractBaseCatalog(LoggingMixin):
     def get_mag_idx(self):
         """ Return magnitude index from region magnitudes """
         try:
-            return bin1d_vec(self.get_magnitudes(), self.region.magnitudes, right_continuous=True)
+            return bin1d_vec(self.get_magnitudes(), self.region.magnitudes, tol=0.00001, right_continuous=True)
         except AttributeError:
             raise CSEPCatalogException("Cannot return magnitude index without self.region.magnitudes")
 
@@ -472,21 +474,6 @@ class AbstractBaseCatalog(LoggingMixin):
         if not self.filters and statements is None:
             raise CSEPCatalogException("Must provide filter statements to function or class to filter")
 
-        def parse_datetime_to_origin_time(dt_input):
-            """ Parses datetime strings with various formats. Handles datetime objects and datetime strings.
-            If datetime object is not time aware will assume that time is UTC, if it is timezone aware will convert to UTC timezone. """
-            if type(dt_input) == datetime.datetime:
-                # check for time zone
-                if dt_input.tzinfo == None:
-                    return create_utc_datetime(dt_input)
-            # handle it as string
-            try:
-                format = parse_string_format(dt_input)
-            except:
-                raise CSEPIOException(
-                    "Supported time-string formats are '%Y-%m-%dT%H:%M:%S.%f' and '%Y-%m-%dT%H:%M:%S'")
-            return strptime_to_utc_datetime(dt_input, format)
-
         # programmatically assign operators
         operators = {'>': operator.gt,
                      '<': operator.lt,
@@ -515,7 +502,6 @@ class AbstractBaseCatalog(LoggingMixin):
             # slower but at the convenience of not having to call multiple times
             filters = list(statements)
             filtered = numpy.copy(self.catalog)
-            idx = numpy.ones(self.event_count, dtype=numpy.bool)
             for filt in filters:
                 name = filt.split(' ')[0]
                 # create indexing array, start with all events
@@ -569,7 +555,6 @@ class AbstractBaseCatalog(LoggingMixin):
         filtered = self.catalog[~mask]
         if in_place:
             self.catalog = filtered
-
             if update_stats:
                 self.update_catalog_stats()
             return self
@@ -691,7 +676,7 @@ class AbstractBaseCatalog(LoggingMixin):
                                                   self.region.ys)
         return output
 
-    def magnitude_counts(self, mag_bins=None, retbins=False):
+    def magnitude_counts(self, mag_bins=None, tol=0.00001, retbins=False):
         """ Computes the count of events within mag_bins
 
 
@@ -719,14 +704,14 @@ class AbstractBaseCatalog(LoggingMixin):
                 return (mag_bins, out)
             else:
                 return out
-        idx = bin1d_vec(self.get_magnitudes(), mag_bins, right_continuous=True)
+        idx = bin1d_vec(self.get_magnitudes(), mag_bins, tol=tol, right_continuous=True)
         numpy.add.at(out, idx, 1)
         if retbins:
             return (mag_bins, out)
         else:
             return out
 
-    def spatial_magnitude_counts(self, mag_bins=None, ret_skipped=False):
+    def spatial_magnitude_counts(self, mag_bins=None, tol=0.00001, ret_skipped=False):
         """ Return counts of events in space-magnitude region.
 
         We figure out the index of the polygons and create a map that relates the spatial coordinate in the
@@ -774,7 +759,8 @@ class AbstractBaseCatalog(LoggingMixin):
                                                                            self.region.idx_map,
                                                                            self.region.xs,
                                                                            self.region.ys,
-                                                                           mag_bins)
+                                                                           mag_bins,
+                                                                           tol=tol)
         if ret_skipped:
             return output, skipped
         else:
@@ -1017,21 +1003,45 @@ class UCERF3Catalog(AbstractBaseCatalog):
         Returns:
             list of catalogs of type UCERF3Catalog
         """
-        with open(filename, 'rb') as catalog_file:
-            # parse 4byte header from merged file
-            number_simulations_in_set = numpy.fromfile(catalog_file, dtype='>i4', count=1)[0]
-            # load all catalogs from merged file
-            for catalog_id in range(number_simulations_in_set):
-                dtype = cls._get_header_dtype(version)
-                version = numpy.fromfile(catalog_file, dtype=">i2", count=1)[0]
-                header = numpy.fromfile(catalog_file, dtype=dtype, count=1)
-                catalog_size = header['catalog_size'][0]
-                # read catalog
-                catalog = numpy.fromfile(catalog_file, dtype=cls._get_catalog_dtype(version), count=catalog_size)
-                # add column that stores catalog_id in case we want to store in database
-                u3_catalog = cls(filename=filename, data=catalog, catalog_id=catalog_id, **kwargs)
-                u3_catalog.dtype = dtype
-                yield u3_catalog
+
+        # handle uncompressed binary file
+        if get_file_extension(filename) == 'bin':
+            with open(filename, 'rb') as catalog_file:
+                # parse 4byte header from merged file
+                number_simulations_in_set = numpy.fromfile(catalog_file, dtype='>i4', count=1)[0]
+                # load all catalogs from merged file
+                for catalog_id in range(number_simulations_in_set):
+                    version = numpy.fromfile(catalog_file, dtype=">i2", count=1)[0]
+                    dtype = cls._get_header_dtype(version)
+                    header = numpy.fromfile(catalog_file, dtype=dtype, count=1)
+                    catalog_size = header['catalog_size'][0]
+                    # read catalog
+                    catalog = numpy.fromfile(catalog_file, dtype=cls._get_catalog_dtype(version), count=catalog_size)
+                    # add column that stores catalog_id in case we want to store in database
+                    u3_catalog = cls(filename=filename, data=catalog, catalog_id=catalog_id, **kwargs)
+                    u3_catalog.dtype = dtype
+                    yield u3_catalog
+
+        # handle compressed file by decompressing inline
+        elif get_file_extension(filename) == 'gz':
+            with gzip.open(filename, 'rb') as catalog_file:
+                number_simulations_in_set = numpy.frombuffer(catalog_file.read(4), dtype='>i4')[0]
+                for catalog_id in range(number_simulations_in_set):
+                    version = numpy.frombuffer(catalog_file.read(2), dtype='>i2')[0]
+                    dtype = cls._get_header_dtype(version)
+                    header_bytes = dtype.itemsize
+                    header = numpy.frombuffer(catalog_file.read(header_bytes), dtype=dtype)
+                    catalog_size = header['catalog_size'][0]
+                    catalog_dtype = cls._get_catalog_dtype(version)
+                    event_bytes = catalog_dtype.itemsize
+                    catalog = numpy.frombuffer(
+                        catalog_file.read(event_bytes*catalog_size),
+                        dtype=catalog_dtype,
+                        count=catalog_size
+                    )
+                    u3_catalog = cls(filename=filename, data=catalog, catalog_id=catalog_id, **kwargs)
+                    u3_catalog.dtype = dtype
+                    yield u3_catalog
 
     @classmethod
     def load_catalog(cls, filename, loader=None, **kwargs):
@@ -1100,10 +1110,8 @@ class UCERF3Catalog(AbstractBaseCatalog):
                                  ("fss_index", ">i4"),
                                  ("grid_node_index", ">i4"),
                                  ("etas_k", ">f8")])
-
         else:
             raise ValueError("unknown catalog version, cannot read catalog.")
-
         return dtype
 
     @staticmethod
