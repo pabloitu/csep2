@@ -555,10 +555,10 @@ def plot_magnitude_histogram(catalogs, comcat, show=True, plot_args=None):
 
 def plot_basemap(basemap, extent, ax=None,  coastline=True, borders=False, linecolor='black', linewidth=True,
                  grid=False, grid_labels=False, set_global=False, show=False):
-    """ Wrapper for cartopy multiple plots
+    """ Wrapper function for multiple cartopy base plots, including access to standard raster webservices
 
      Args:
-         basemap (str): Possible values are: stock_img, stamen_terrain, stamen_terrain-background, google-satellite, ESRI_terrain, ESRI_imagery, ESRI_relief, ESRI_topo, ESRI_terrain. Default is None
+         basemap (str): Possible values are: stock_img, stamen_terrain, stamen_terrain-background, google-satellite, ESRI_terrain, ESRI_imagery, ESRI_relief, ESRI_topo, ESRI_terrain, or webservice link (see examples in :func:`csep.utils.plots._get_basemap`. Default is None
          extent (list):  [lon_min, lon_max, lat_min, lat_max]
          show (bool): Flag if the figure is displayed
          set_global (bool): Display the complete globe as basemap
@@ -566,9 +566,11 @@ def plot_basemap(basemap, extent, ax=None,  coastline=True, borders=False, linec
          borders (bool): Flag to plot country borders. default False,
          linewidth (float): Line width of borders and coast lines. default 1.5,
          linecolor (str): Color of borders and coast lines. default 'black',
+         grid (bool): Draws a grid in the basemap
+         grid_labels (bool): Annotate grid values
 
      Returns:
-         :ax :class:`matplotlib.pyplot.ax` object
+         :class:`matplotlib.pyplot.ax` object
 
      """
     if ax is None:
@@ -613,37 +615,40 @@ def plot_basemap(basemap, extent, ax=None,  coastline=True, borders=False, linec
 
 
 def plot_catalog(catalog, ax=None, show=False, extent=None, set_global=False, plot_args=None):
-    """ Plot spatial dataset such as data from a gridded forecast
+    """ Plot catalog in a region
 
     Args:
         catalog (:class:`CSEPCatalog`): Catalog object to be plotted
-        region (:class:`CartesianGrid2D`): Region in which gridded values are contained
+        ax (:class:`matplotlib.pyplot.ax`): Previously defined ax object (e.g from plot_spatial_dataset)
         show (bool): Flag if the figure is displayed
-        extent (list):  default :func:`forecast.region.get_bbox()`
+        extent (list):  default 1.05-:func:`catalog.region.get_bbox()`
         set_global (bool): Display the complete globe as basemap
-        plot_args (dict): matplotlib and cartopy plot arguments. Dict keys are str, whose values can be:
+        plot_args (dict): matplotlib and cartopy plot arguments. The dictionary keys are str, whose items can be:
 
-    Optional plot arguments:
-       - :figsize: :class:`tuple`/:class:`list` - default [6.4, 4.8]
-       - :title: :class:`str` - default None
-       - :title_size: :class:`int` - default 10
-       - :filename: :class:`str` - default None
-       - :projection: :class:`cartopy.crs.Projection` - default :class:`cartopy.crs.PlateCarree`
-       - :grid: :class:`bool` - default True
-       - :grid_labels: :class:`bool` - default True
-
-
-       - :basemap:  :class:`str`/:class:`None` -Possible :class:`str` values are: stock_img, stamen_terrain, stamen_terrain-background, google-satellite, ESRI_terrain, ESRI_imagery, ESRI_relief, ESRI_topo, ESRI_terrain. Default is None
-       - :coastline: :class:`bool` - Flag to plot coastline. default True,
-       - :borders: :class:`str`bool - Flag to plot country borders. default False,
-       - :linewidth: :class:`float` - Line width of borders and coast lines. default 1.5,
-       - :linecolor: :class:`str` - Color of borders and coast lines. default 'black',
-       - :markersize: :class:`float` - Constant size for all earthquakes
-       - :markercolor: :class:`str` - Color for all earthquakes
-       - :cmap: :class:`str`/:class:`pyplot.colors.Colormap` -  default 'viridis'
+           - :figsize: :class:`tuple`/:class:`list` - default [6.4, 4.8]
+           - :title: :class:`str` - default :class:`catalog.name`
+           - :title_size: :class:`int` - default 10
+           - :filename: :class:`str` - File to save figure. default None
+           - :projection: :class:`cartopy.crs.Projection` - default :class:`cartopy.crs.PlateCarree`
+           - :grid: :class:`bool` - default True
+           - :grid_labels: :class:`bool` - default True
+           - :marker: :class:`str` - Marker type
+           - :markersize: :class:`float` - Constant size for all earthquakes
+           - :markercolor: :class:`str` - Color for all earthquakes
+           - :basemap:  :class:`str`/:class:`None`. Possible values are: stock_img, stamen_terrain, stamen_terrain-background, google-satellite, ESRI_terrain, ESRI_imagery, ESRI_relief, ESRI_topo, ESRI_terrain, or webservice link. Default is None
+           - :coastline: :class:`bool` - Flag to plot coastline. default True,
+           - :borders: :class:`bool` - Flag to plot country borders. default False,
+           - :linewidth: :class:`float` - Line width of borders and coast lines. default 1.5,
+           - :linecolor: :class:`str` - Color of borders and coast lines. default 'black',
+           - :alpha: :class:`float` - Transparency for the earthquakes scatter
+           - :mag_scale: :class:`float` - Scaling of the scatter
+           - :legend: :class:`bool` - Flag to display the legend box
+           - :legend_loc: :class:`int`/:class:`str` - Position of the legend
+           - :mag_ticks: :class:`list` - Ticks to display in the legend
+           - :labelspacing: :class:`int` - Separation between legend ticks
 
     Returns:
-        :ax :class:`matplotlib.pyplot.ax` object
+        :class:`matplotlib.pyplot.ax` object
 
     """
     # Get spatial information for plotting
@@ -657,12 +662,18 @@ def plot_catalog(catalog, ax=None, show=False, extent=None, set_global=False, pl
     plot_args = plot_args or {}
     # figure and axes properties
     figsize = plot_args.get('figsize', None)
-    title = plot_args.get('title', 'Catalog')
+    title = plot_args.get('title', catalog.name)
     title_size = plot_args.get('title_size', None)
     filename = plot_args.get('filename', None)
     # scatter properties
-    markersize = plot_args.get('markersize', 4)
+    markersize = plot_args.get('markersize', 2)
     markercolor = plot_args.get('markercolor', 'blue')
+    alpha = plot_args.get('alpha', 1)
+    mag_scale = plot_args.get('mag_scale', 1)
+    legend = plot_args.get('legend', False)
+    legend_loc = plot_args.get('legend_loc', 1)
+    mag_ticks = plot_args.get('mag_ticks', False)
+    labelspacing = plot_args.get('labelspacing', 1)
     # cartopy properties
     projection = plot_args.get('projection', ccrs.PlateCarree(central_longitude=0.0))
     grid = plot_args.get('grid', True)
@@ -688,15 +699,33 @@ def plot_catalog(catalog, ax=None, show=False, extent=None, set_global=False, pl
     ax = plot_basemap(basemap, extent, ax=ax, coastline=coastline, borders=borders,
                       linecolor=linecolor, linewidth=linewidth)
 
+    # Scaling function
+    mw_range = [min(catalog.get_magnitudes()), max(catalog.get_magnitudes())]
+    def size_map(markersize, values, scale):
+        if isinstance(mag_scale, (int, float)):
+            return (markersize/(scale**mw_range[0]) * numpy.power(values, scale))
+        elif isinstance(scale, (numpy.ndarray, list)):
+            return scale
+        else:
+            raise ValueError('scale data type not supported')
 
-    ## Plot spatial dataset
-    scatter = ax.scatter(
-                catalog.get_longitudes(), catalog.get_latitudes(),
-                s=markersize,
-                transform=cartopy.crs.PlateCarree(),
-                color=markercolor,  # Colormap to use
-                alpha=1)
+    ## Plot catalog
+    scatter = ax.scatter(catalog.get_longitudes(), catalog.get_latitudes(),
+                           s=size_map(markersize, catalog.get_magnitudes(), mag_scale),
+                           transform=cartopy.crs.PlateCarree(),
+                           color=markercolor,
+                           alpha=alpha)
 
+    # Legend
+    if legend:
+        if not mag_ticks:
+            mag_ticks = numpy.round(numpy.linspace(mw_range[0], mw_range[1], 4), 1)
+        handles, labels = scatter.legend_elements(prop="sizes",
+                                                  num=list(size_map(markersize, mag_ticks, mag_scale)),
+                                                  alpha=0.3)
+        ax.legend(handles, mag_ticks,
+                  loc=legend_loc, title=r"Magnitudes",title_fontsize=16,
+                  labelspacing=labelspacing, handletextpad=5, framealpha=False)
 
     # Gridline options
     if grid:
@@ -727,27 +756,28 @@ def plot_spatial_dataset(gridded, region, ax=None, show=False, extent=None, set_
         set_global (bool): Display the complete globe as basemap
         plot_args (dict): matplotlib and cartopy plot arguments. Dict keys are str, whose values can be:
 
-    Optional plot arguments:
-       - :figsize: :class:`tuple`/:class:`list` - default [6.4, 4.8]
-       - :title: :class:`str` - default None
-       - :title_size: :class:`int` - default 10
-       - :filename: :class:`str` - default None
-       - :projection: :class:`cartopy.crs.Projection` - default :class:`cartopy.crs.PlateCarree`
-       - :grid: :class:`bool` - default True
-       - :grid_labels: :class:`bool` - default True
-       - :basemap:  :class:`str`/:class:`None` -Possible :class:`str` values are: stock_img, stamen_terrain, stamen_terrain-background, google-satellite, ESRI_terrain, ESRI_imagery, ESRI_relief, ESRI_topo, ESRI_terrain. Default is None
-       - :coastline: :class:`bool` - Flag to plot coastline. default True,
-       - :borders: :class:`str`bool - Flag to plot country borders. default False,
-       - :linewidth: :class:`float` - Line width of borders and coast lines. default 1.5,
-       - :linecolor: :class:`str` - Color of borders and coast lines. default 'black',
-       - :cmap: :class:`str`/:class:`pyplot.colors.Colormap` -  default 'viridis'
-       - :clabel: :class:`str` - default None
-       - :clim: :class:`list` - default None
-       - :alpha: :class:`float` - default 1
-       - :alpha_exp: :class:`float` - Exponent for the alpha func (recommended between 0.4 and 1). default 0
+           - :figsize: :class:`tuple`/:class:`list` - default [6.4, 4.8]
+           - :title: :class:`str` - default None
+           - :title_size: :class:`int` - default 10
+           - :filename: :class:`str` - default None
+           - :projection: :class:`cartopy.crs.Projection` - default :class:`cartopy.crs.PlateCarree`
+           - :grid: :class:`bool` - default True
+           - :grid_labels: :class:`bool` - default True
+           - :basemap:  :class:`str`. Possible  values are: stock_img, stamen_terrain, stamen_terrain-background, google-satellite, ESRI_terrain, ESRI_imagery, ESRI_relief, ESRI_topo, ESRI_terrain, or webservice link. Default is None
+           - :coastline: :class:`bool` - Flag to plot coastline. default True,
+           - :borders: :class:`bool` - Flag to plot country borders. default False,
+           - :linewidth: :class:`float` - Line width of borders and coast lines. default 1.5,
+           - :linecolor: :class:`str` - Color of borders and coast lines. default 'black',
+           - :cmap: :class:`str`/:class:`pyplot.colors.Colormap` -  default 'viridis'
+           - :clabel: :class:`str` - default None
+           - :clim: :class:`list` - default None
+           - :alpha: :class:`float` - default 1
+           - :alpha_exp: :class:`float` - Exponent for the alpha func (recommended between 0.4 and 1). default 0
+
 
     Returns:
-        :ax :class:`matplotlib.pyplot.ax` object
+        :class:`matplotlib.pyplot.ax` object
+
 
     """
     # Get spatial information for plotting
@@ -1357,7 +1387,11 @@ def _get_basemap(basemap):
                  'MapServer/tile/{z}/{y}/{x}.jpg'
         tiles = img_tiles.GoogleTiles(url=webservice)
     else:
-        raise ValueError('Basemap type not valid or not implemented')
+        try:
+            webservice = basemap
+            tiles = img_tiles.GoogleTiles(url=webservice)
+        except:
+            raise ValueError('Basemap type not valid or not implemented')
 
     return tiles
 
