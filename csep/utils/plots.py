@@ -1056,7 +1056,7 @@ def plot_distribution_test(evaluation_result, axes=None, show=True, plot_args=No
     ax.set_ylabel(ylabel)
 
     if filename is not None:
-        ax.figure.savefig(filename + '.pdf')
+        # ax.figure.savefig(filename + '.pdf')
         ax.figure.savefig(filename + '.png', dpi=300)
 
     # func has different return types, before release refactor and remove plotting from evaluation.
