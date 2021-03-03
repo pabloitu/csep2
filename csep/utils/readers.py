@@ -610,7 +610,7 @@ def ingv_horus(fname):
                                 line['minute'],
                                 line['second']
                                ) + dt
-        event_tuple = (Time,
+        event_tuple = (n,
                        datetime_to_utc_epoch(Time),
                        float(line["lat"]),
                        float(line["lon"]),
