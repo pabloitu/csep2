@@ -506,6 +506,7 @@ def ingv_emrcmt(fname):
     n_event = 0
     with open(fname) as file_:
         reader = csv.reader(file_)
+        next(reader, None) # skip header
         for n, line in enumerate(reader):
             if is_header_line(line):
                 continue
