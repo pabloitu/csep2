@@ -174,7 +174,7 @@ def conditional_likelihood_test(gridded_forecast, observed_catalog, num_simulati
     """
 
     # grid catalog onto spatial grid
-    gridded_catalog_data = observed_catalog.spatial_magnitude_counts()
+    gridded_catalog_data = observed_catalog.spatial_magnitude_counts(gridded_forecast.magnitudes)
 
     # simply call likelihood test on catalog data and forecast
     qs, obs_ll, simulated_ll = _poisson_likelihood_test(gridded_forecast.data, gridded_catalog_data,
@@ -304,7 +304,7 @@ def likelihood_test(gridded_forecast, observed_catalog, num_simulations=1000, se
     """
 
     # grid catalog onto spatial grid
-    gridded_catalog_data = observed_catalog.spatial_magnitude_counts()
+    gridded_catalog_data = observed_catalog.spatial_magnitude_counts(gridded_forecast.magnitudes)
 
     # simply call likelihood test on catalog and forecast
     qs, obs_ll, simulated_ll = _poisson_likelihood_test(gridded_forecast.data, gridded_catalog_data,
