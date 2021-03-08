@@ -1205,34 +1205,80 @@ def _get_marker_style(obs_stat, p, one_sided_lower):
         fmt = 'ro'
     else:
         # green square
-        fmt = 'gs'
+        fmt = 'go'
     if one_sided_lower:
         if obs_stat < p[0]:
             fmt = 'ro'
         else:
-            fmt = 'gs'
+            fmt = 'go'
     return fmt
 
-def plot_comparison_test(results, plot_args=None):
+def _get_marker_t_color(distribution):
+    """Returns matplotlib marker style as fmt string"""
+    if distribution[0] > 0. and distribution[1] > 0.:
+        fmt = 'green'
+    elif distribution[0] < 0. and distribution[1] < 0.:
+        fmt = 'red'
+    else:
+        fmt = 'grey'
+
+    return fmt
+
+def _get_marker_w_color(distribution):
+    """Returns matplotlib marker style as fmt string"""
+
+    if distribution < 0.05:
+        fmt = True
+    else:
+        fmt = False
+
+    return fmt
+
+def plot_comparison_test(results_t, results_w, plot_args=None):
     """Plots list of T-Test or W-Test Results"""
     if plot_args is None:
         plot_args = {}
     title = plot_args.get('title', 'CSEP1 Consistency Test')
     xlabel = plot_args.get('xlabel', 'X')
     ylabel = plot_args.get('ylabel', 'Y')
-
+    ylims = plot_args.get('ylims', (None, None))
+    capsize = plot_args.get('capsize', 2)
+    linewidth = plot_args.get('linewidth', 1)
+    markersize = plot_args.get('markersize', 2)
     fig, ax = pyplot.subplots()
+
     ax.axhline(y=0, linestyle='--', color='black')
-    for index, result in enumerate(results):
-        ylow = result.observed_statistic - result.test_distribution[0]
-        yhigh = result.test_distribution[1] - result.observed_statistic
-        ax.errorbar(index, result.observed_statistic, yerr=numpy.array([[ylow, yhigh]]).T, color='black', capsize=4)
-        ax.plot(index, result.observed_statistic, 'ok')
-    ax.set_xticklabels([res.sim_name[0] for res in results])
-    ax.set_xticks(numpy.arange(len(results)))
+    for index, result in enumerate(zip(results_t, results_w)):
+        result_t = result[0]
+        result_w = result[1]
+        ylow = result_t.observed_statistic - result_t.test_distribution[0]
+        yhigh = result_t.test_distribution[1] - result_t.observed_statistic
+        color = _get_marker_t_color( result_t.test_distribution)
+        ax.errorbar(index, result_t.observed_statistic,  yerr=numpy.array([[ylow, yhigh]]).T ,
+
+                    color = color,
+                    linewidth=linewidth, capsize=capsize)
+
+        if  _get_marker_w_color( result_w.quantile):
+            facecolor = _get_marker_t_color( result_t.test_distribution)
+        else:
+            facecolor = 'white'
+        ax.plot(index, result_t.observed_statistic, marker='o', markerfacecolor=facecolor, markeredgecolor=color, markersize=markersize)
+
+    ax.set_xticklabels([res.sim_name[0] for res in results_t], rotation=90)
+    ax.set_xticks(numpy.arange(len(results_t)))
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax.set_title(title)
+    ax.yaxis.grid()
+    xTickPos, _ = pyplot.xticks()
+    ax.yaxis.set_major_locator(matplotlib.ticker.MaxNLocator(integer=True))
+    ax.set_ylim([ylims[0], ylims[1]])
+    ax.set_xlim([ax.get_xlim()[0] + 0.5, ax.get_xlim()[1] - 0.5])
+    ax.bar(xTickPos, numpy.array([9999] * len(xTickPos)), bottom=-2000,
+            width=(xTickPos[1] - xTickPos[0]), color=['gray', 'w'], alpha=0.2)
+
+
     fig.tight_layout()
     return ax
 
