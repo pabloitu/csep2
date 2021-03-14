@@ -745,7 +745,8 @@ def plot_catalog(catalog, ax=None, show=False, extent=None, set_global=False, pl
     return ax
 
 
-def plot_spatial_dataset(gridded, region, ax=None, show=False, extent=None, set_global=False, plot_args=None):
+def plot_spatial_dataset(gridded, region, ax=None, show=False,
+                         extent=None, set_global=False, plot_args=None, levels=5):
     """ Plot spatial dataset such as data from a gridded forecast
 
     Args:
@@ -839,8 +840,11 @@ def plot_spatial_dataset(gridded, region, ax=None, show=False, extent=None, set_
     lons, lats = numpy.meshgrid(numpy.append(region.xs, region.xs[-1] + region.dh),
                                 numpy.append(region.ys, region.ys[-1] + region.dh))
 
-    im = ax.pcolor(lons, lats, gridded, cmap=cmap, alpha=alpha, snap=True, transform=ccrs.PlateCarree())
-    im.set_clim(clim)
+    print(levels, clim)
+    im = ax.contourf(lons[:-1,:-1], lats[:-1,:-1], gridded, cmap=cmap, alpha=alpha,
+                   snap=True, transform=ccrs.PlateCarree(),
+                     levels=levels, vmin=clim[0], vmax=clim[1])
+    # im.set_clim(clim)
 
     # Colorbar options
     # create an axes on the right side of ax. The width of cax will be 5%
