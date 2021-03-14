@@ -860,7 +860,7 @@ def plot_spatial_dataset(gridded, region, ax=None, show=False, extent=None, set_
     # matplotlib figure options
     ax.set_title(title, y=1.06)
     if filename is not None:
-        ax.get_figure().savefig(filename + '.pdf')
+        # ax.get_figure().savefig(filename + '.pdf')
         ax.get_figure().savefig(filename + '.png', dpi=300)
     if show:
         pyplot.show()
