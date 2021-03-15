@@ -744,8 +744,129 @@ def plot_catalog(catalog, ax=None, show=False, extent=None, set_global=False, pl
 
     return ax
 
+def plot_spatial_dataset(gridded, region, ax=None, show=False, extent=None, set_global=False, plot_args=None):
+    """ Plot spatial dataset such as data from a gridded forecast
 
-def plot_spatial_dataset(gridded, region, ax=None, show=False,
+    Args:
+        gridded (2D :class:`numpy.array`): Values according to `region`,
+        region (:class:`CartesianGrid2D`): Region in which gridded values are contained
+        show (bool): Flag if the figure is displayed
+        extent (list):  default :func:`forecast.region.get_bbox()`
+        set_global (bool): Display the complete globe as basemap
+        plot_args (dict): matplotlib and cartopy plot arguments. Dict keys are str, whose values can be:
+
+           - :figsize: :class:`tuple`/:class:`list` - default [6.4, 4.8]
+           - :title: :class:`str` - default None
+           - :title_size: :class:`int` - default 10
+           - :filename: :class:`str` - default None
+           - :projection: :class:`cartopy.crs.Projection` - default :class:`cartopy.crs.PlateCarree`
+           - :grid: :class:`bool` - default True
+           - :grid_labels: :class:`bool` - default True
+           - :basemap:  :class:`str`. Possible  values are: stock_img, stamen_terrain, stamen_terrain-background, google-satellite, ESRI_terrain, ESRI_imagery, ESRI_relief, ESRI_topo, ESRI_terrain, or webservice link. Default is None
+           - :coastline: :class:`bool` - Flag to plot coastline. default True,
+           - :borders: :class:`bool` - Flag to plot country borders. default False,
+           - :linewidth: :class:`float` - Line width of borders and coast lines. default 1.5,
+           - :linecolor: :class:`str` - Color of borders and coast lines. default 'black',
+           - :cmap: :class:`str`/:class:`pyplot.colors.Colormap` -  default 'viridis'
+           - :clabel: :class:`str` - default None
+           - :clim: :class:`list` - default None
+           - :alpha: :class:`float` - default 1
+           - :alpha_exp: :class:`float` - Exponent for the alpha func (recommended between 0.4 and 1). default 0
+
+
+    Returns:
+        :class:`matplotlib.pyplot.ax` object
+
+
+    """
+    # Get spatial information for plotting
+    bbox = region.get_bbox()
+    if extent is None:
+        extent = [bbox[0], bbox[1], bbox[2] + region.dh, bbox[3] + region.dh]
+
+    # Retrieve plot arguments
+    plot_args = plot_args or {}
+    # figure and axes properties
+    figsize = plot_args.get('figsize', None)
+    title = plot_args.get('title', 'Spatial Dataset')
+    title_size = plot_args.get('title_size', None)
+    filename = plot_args.get('filename', None)
+    # cartopy properties
+    projection = plot_args.get('projection', ccrs.PlateCarree(central_longitude=0.0))
+    grid = plot_args.get('grid', True)
+    grid_labels = plot_args.get('grid_labels', False)
+    basemap = plot_args.get('basemap', None)
+    coastline = plot_args.get('coastline', True)
+    borders = plot_args.get('borders', False)
+    linewidth = plot_args.get('linewidth', True)
+    linecolor = plot_args.get('linecolor', 'black')
+    # color bar properties
+    cmap = plot_args.get('cmap', None)
+    clabel = plot_args.get('clabel', '')
+    clim = plot_args.get('clim', None)
+    alpha = plot_args.get('alpha', 1)
+    alpha_exp = plot_args.get('alpha_exp', 0)
+
+
+    # Instantiage GeoAxes object
+    if ax is None:
+        fig = pyplot.figure(figsize=figsize)
+        ax = fig.add_subplot(111, projection=projection)
+    else:
+        fig = ax.get_figure()
+
+    if set_global:
+        ax.set_global()
+    else:
+        ax.set_extent(extents=extent, crs=ccrs.PlateCarree()) # Defined extent always in lat/lon
+
+    # Basemap plotting
+    ax = plot_basemap(basemap, extent, ax=ax, coastline=coastline, borders=borders,
+                      linecolor=linecolor, linewidth=linewidth)
+
+    ## Define colormap and transparency function
+    if isinstance(cmap, str) or not cmap:
+        cmap = pyplot.get_cmap(cmap)
+    cmap_tup = cmap(numpy.arange(cmap.N))
+    if isinstance(alpha_exp, (float,int)):
+        if alpha_exp != 0:
+            cmap_tup[:, -1] = numpy.linspace(0, 1, cmap.N) ** alpha_exp
+            alpha = None
+    cmap = matplotlib.colors.ListedColormap(cmap_tup)
+
+    ## Plot spatial dataset
+    lons, lats = numpy.meshgrid(numpy.append(region.xs, region.xs[-1] + region.dh),
+                                numpy.append(region.ys, region.ys[-1] + region.dh))
+
+    im = ax.pcolor(lons, lats, gridded, cmap=cmap, alpha=alpha, snap=True, transform=ccrs.PlateCarree())
+    im.set_clim(clim)
+
+    # Colorbar options
+    # create an axes on the right side of ax. The width of cax will be 5%
+    # of ax and the padding between cax and ax will be fixed at 0.05 inch.
+    cax = fig.add_axes([ax.get_position().x1 + 0.01, ax.get_position().y0, 0.025, ax.get_position().height],
+                       label='Colorbar')
+    cbar = fig.colorbar(im, ax=ax, cax=cax)
+    cbar.set_label(clabel)
+
+    # Gridline options
+    if grid:
+        gl = ax.gridlines(draw_labels=grid_labels, alpha=0.5)
+        gl.right_labels = False
+        gl.xformatter = LONGITUDE_FORMATTER
+        gl.yformatter = LATITUDE_FORMATTER
+
+    # matplotlib figure options
+    ax.set_title(title, y=1.06)
+    if filename is not None:
+        # ax.get_figure().savefig(filename + '.pdf')
+        ax.get_figure().savefig(filename + '.png', dpi=300)
+    if show:
+        pyplot.show()
+
+    return ax
+
+def plot_spatial_contourf(gridded, region, ax=None, show=False,
                          extent=None, set_global=False, plot_args=None, levels=5):
     """ Plot spatial dataset such as data from a gridded forecast
 

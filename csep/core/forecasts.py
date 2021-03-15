@@ -12,7 +12,7 @@ from csep.utils.calc import bin1d_vec
 from csep.utils.time_utils import decimal_year, datetime_to_utc_epoch
 from csep.core.catalogs import AbstractBaseCatalog
 from csep.utils.constants import SECONDS_PER_ASTRONOMICAL_YEAR
-from csep.utils.plots import plot_spatial_dataset
+from csep.utils.plots import plot_spatial_dataset, plot_spatial_contourf
 
 
 # idea: should this be a SpatialDataSet and the class below SpaceMagnitudeDataSet, bc of functions like
@@ -443,6 +443,42 @@ class GriddedForecast(MarkedGriddedDataSet):
                                       set_global=set_global, plot_args=plot_args)
         return ax
 
+
+    def plot_contourf(self, ax=None, show=False, log=True, extent=None, set_global=False,
+             levels=None, plot_args=None):
+        """ Plot gridded forecast according to plate-carree projection
+
+        Args:
+            show (bool): if true, show the figure. this call is blocking.
+            plot_args (optional/dict): dictionary containing plotting arguments for making figures
+
+        Returns:
+            axes: matplotlib.Axes.axes
+        """
+        # no mutable function arguments
+        dh = round(self.region.dh, 5)
+        if self.start_time is None or self.end_time is None:
+            time = 'forecast period'
+        else:
+            start = decimal_year(self.start_time)
+            end = decimal_year(self.end_time)
+            time = f'{round(end-start,3)} years'
+
+        plot_args = plot_args or {}
+        plot_args.setdefault('figsize', (10, 10))
+        plot_args.setdefault('title', self.name)
+
+        # this call requires internet connection and basemap
+        if log:
+            plot_args.setdefault('clabel', f'log10 M{self.min_magnitude}+ rate per {str(dh)}° x {str(dh)}° per {time}')
+            with numpy.errstate(divide='ignore'):
+                ax = plot_spatial_contourf(numpy.log10(self.spatial_counts(cartesian=True)), self.region, ax=ax,
+                                          show=show, extent=extent, levels=None, set_global=set_global, plot_args=plot_args)
+        else:
+            plot_args.setdefault('clabel', f'M{self.min_magnitude}+ rate per {str(dh)}° x {str(dh)}° per {time}')
+            ax = plot_spatial_contourf(self.spatial_counts(cartesian=True), self.region, ax=ax,show=show, extent=extent,
+                                      set_global=set_global, plot_args=plot_args)
+        return ax
 
 class CatalogForecast(LoggingMixin):
     """ Catalog based forecast defined as a family of stochastic event sets. """
